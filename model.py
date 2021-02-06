@@ -191,7 +191,7 @@ class Model(nn.Module):
                                           )
         ko = num_timesteps_input - 2 * 2 * (temporal_kernel_size - 1)
         if ko < 1:
-            raise ValueError("!!!")
+            raise ValueError("temporal kernel size must be greater than 1, but received {}".format(ko))
         else:
             self.output = Output(in_channels=temporal_channels,
                                  out_channels=1,

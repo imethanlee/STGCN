@@ -162,18 +162,18 @@ class STConvBlock(nn.Module):
         return out4
 
 
-class Model(nn.Module):
+class STGCN(nn.Module):
     def __init__(self,
                  num_nodes: int,
-                 num_features: int,
                  graph_conv_kernel: torch.Tensor,
+                 num_features: int = 1,
                  num_timesteps_input: int = 12,
                  num_timesteps_output: int = 1,
                  temporal_channels: int = 64,
                  spacial_channels: int = 16,
                  graph_conv_approx: str = "Linear",
                  temporal_kernel_size: int = 3):
-        super(Model, self).__init__()
+        super(STGCN, self).__init__()
         self.graph_conv_kernel = graph_conv_kernel
         self.st_conv_block1 = STConvBlock(num_nodes=num_nodes,
                                           in_channels=num_features,
@@ -189,13 +189,13 @@ class Model(nn.Module):
                                           spacial_channels=spacial_channels,
                                           graph_conv_approx=graph_conv_approx
                                           )
-        ko = num_timesteps_input - 2 * 2 * (temporal_kernel_size - 1)
-        if ko < 1:
-            raise ValueError("temporal kernel size must be greater than 1, but received {}".format(ko))
+        self.ko = num_timesteps_input - 2 * 2 * (temporal_kernel_size - 1)
+        if self.ko < 1:
+            raise ValueError("temporal kernel size must be greater than 1, but received {}".format(self.ko))
         else:
             self.output = Output(in_channels=temporal_channels,
-                                 out_channels=1,
-                                 ko=ko,
+                                 out_channels=num_timesteps_output,
+                                 ko=self.ko,
                                  num_nodes=num_nodes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

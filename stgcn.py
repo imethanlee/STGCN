@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 import torch.optim as optim
-
+import numpy as np
 
 class TemporalChannelAlign(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
@@ -24,6 +24,15 @@ class TemporalChannelAlign(nn.Module):
         return x_tca
 
 
+class GraphChannelAlign(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int):
+        super(GraphChannelAlign, self).__init__()
+        self.tca = TemporalChannelAlign(in_channels, out_channels)
+
+    def forward(self, x: torch.Tensor):
+        return self.tca(x.permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+
+
 class TemporalConv(nn.Module):
     """
         :param x: [batch, time_step, num_nodes, in_features].
@@ -31,9 +40,9 @@ class TemporalConv(nn.Module):
         :param in_channel: int, size of input channel.
         :param out_channel: int, size of output channel.
         :param activation: str, activation function.
-        :return: tensor, [batch_size, time_step-Kt+1, in_features, num_nodes].
+        :return: tensor, [batch_size, time_step-kt+1, in_features, num_nodes].
     """
-    def __init__(self, kt: int, in_channels: int, out_channels: int, activation: str = "GLU"):
+    def __init__(self, kt: int, in_channels: int, out_channels: int, num_nodes: int, activation: str = "GLU"):
         super(TemporalConv, self).__init__()
         self.kt = kt
         self.in_channels = in_channels
@@ -47,6 +56,9 @@ class TemporalConv(nn.Module):
             self.conv = nn.Conv2d(in_channels=in_channels,
                                   out_channels=out_channels,
                                   kernel_size=(1, kt))
+        self.sigmoid = nn.Sigmoid()
+        self.relu = nn.ReLU()
+        self.linear = nn.Linear(num_nodes, num_nodes)
         self.tca = TemporalChannelAlign(in_channels=in_channels,
                                         out_channels=out_channels)
 
@@ -54,14 +66,20 @@ class TemporalConv(nn.Module):
         # Permute: [batch,time_step,num_nodes,in_channels]
         # -------> [batch,in_channels,num_nodes,time_step]
         x_permute = x.permute(0, 3, 2, 1)
-        x_conv = self.conv(x_permute)
         x_tca = self.tca(x_permute)[:, :, :, self.kt - 1:]
+        x_conv = self.conv(x_permute)
         if self.activation == "GLU":
             p = x_conv[:, :self.out_channels, :, :]
             q = x_conv[:, -self.out_channels:, :, :]
-            tc_out = (p + x_tca) * torch.sigmoid(q)
+            # pp = p + x_tca
+            # qq = q
+            pp = self.linear((p + x_tca).permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
+            qq = self.linear(q.permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
+            tc_out = pp * torch.sigmoid(qq)
         elif self.activation == "sigmoid":
-            tc_out = torch.sigmoid(x_conv)
+            tc_out = self.sigmoid(x_conv)
+        elif self.activation == "relu":
+            tc_out = self.relu(x_conv)
         else:
             raise ValueError("No such activation")
         tc_out = tc_out.permute(0, 3, 2, 1)
@@ -79,25 +97,29 @@ class GraphConv(nn.Module):
         """
     def __init__(self, in_channels: int, out_channels: int, approx: str, use_bias=True):
         super(GraphConv, self).__init__()
+        self.gca = GraphChannelAlign(in_channels, out_channels)
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.approx = approx
         self.use_bias = use_bias
-        self.weight = nn.Parameter(torch.FloatTensor(self.in_channels, self.out_channels))
+        self.weight = nn.Parameter(torch.FloatTensor(self.out_channels, self.out_channels))
         if self.use_bias:
             self.bias = nn.Parameter(torch.FloatTensor(1, self.out_channels))
         self.init_params()
 
     def init_params(self):
-        init.xavier_uniform_(self.weight)
-        if self.use_bias:
-            init.xavier_uniform_(self.bias)
+        init.kaiming_uniform_(self.weight)
+        if self.use_bias is not None:
+            _out_feats_bias = self.bias.size(0)
+            stdv_b = 1. / np.sqrt(_out_feats_bias)
+            init.uniform_(self.bias, -stdv_b, stdv_b)
 
     def forward(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
         # Graph Convolution Approximation: 1. Linear 2. Chebshev
+        x_gca = self.gca(x)
         gc_out = None
         if self.approx == "Linear":
-            fully_conn = torch.matmul(x, self.weight)
+            fully_conn = torch.matmul(x_gca, self.weight)
             gc_out = torch.matmul(kernel, fully_conn)
         elif self.approx == "Cheb":
             gc_out = kernel
@@ -112,17 +134,20 @@ class GraphConv(nn.Module):
 class Output(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, ko: int, num_nodes: int):
         super(Output, self).__init__()
+        middle_channels = 2 * in_channels
         self.temporal_conv1 = TemporalConv(kt=ko,
                                            in_channels=in_channels,
-                                           out_channels=in_channels
+                                           out_channels=middle_channels,
+                                           num_nodes=num_nodes,
                                            )
-        self.layer_norm = nn.LayerNorm([num_nodes, in_channels])
+        self.layer_norm = nn.LayerNorm([num_nodes, middle_channels])
         self.temporal_conv2 = TemporalConv(kt=1,
-                                           in_channels=in_channels,
-                                           out_channels=in_channels,
+                                           in_channels=middle_channels,
+                                           out_channels=middle_channels,
+                                           num_nodes=num_nodes,
                                            activation="sigmoid"
                                            )
-        self.linear = nn.Linear(in_features=in_channels,
+        self.linear = nn.Linear(in_features=middle_channels,
                                 out_features=out_channels,
                                 bias=True
                                 )
@@ -140,24 +165,26 @@ class STConvBlock(nn.Module):
                  temporal_channels: int, kt: int,
                  spacial_channels: int, graph_conv_approx: str):
         super(STConvBlock, self).__init__()
-        self.tc_block1 = TemporalConv(kt=kt,
-                                      in_channels=in_channels,
-                                      out_channels=temporal_channels,
-                                      activation="GLU")
-        self.gc_block = GraphConv(in_channels=temporal_channels,
-                                  out_channels=spacial_channels,
-                                  approx=graph_conv_approx,
-                                  use_bias=True)
-        self.tc_block2 = TemporalConv(kt=kt,
-                                      in_channels=spacial_channels,
-                                      out_channels=temporal_channels,
-                                      activation="GLU")
+        self.tc1 = TemporalConv(kt=kt,
+                                in_channels=in_channels,
+                                out_channels=temporal_channels,
+                                num_nodes=num_nodes,
+                                activation="GLU")
+        self.gc = GraphConv(in_channels=temporal_channels,
+                            out_channels=spacial_channels,
+                            approx=graph_conv_approx,
+                            use_bias=True)
+        self.tc2 = TemporalConv(kt=kt,
+                                in_channels=spacial_channels,
+                                out_channels=temporal_channels,
+                                num_nodes=num_nodes,
+                                activation="relu")
         self.layer_norm = nn.LayerNorm([num_nodes, temporal_channels])
 
     def forward(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
-        out1 = self.tc_block1(x)
-        out2 = torch.relu(self.gc_block(out1, kernel))
-        out3 = self.tc_block2(out2)
+        out1 = self.tc1(x)
+        out2 = torch.relu(self.gc(out1, kernel))
+        out3 = self.tc2(out2)
         out4 = self.layer_norm(out3)
         return out4
 

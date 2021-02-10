@@ -10,13 +10,20 @@ class Utils:
     std = 0
 
     @staticmethod
+    def fit(x: np.ndarray):
+        len_x = len(x)
+        Utils.mean = np.sum(x) / len_x
+        Utils.std = np.std(x)
+
+    @staticmethod
     def z_score(x: np.ndarray):
-        x_flatten = x.flatten()
-        len_x = len(x_flatten)
-        Utils.mean = np.sum(x_flatten) / len_x
-        Utils.std = np.std(x_flatten)
         z = (x - Utils.mean) / Utils.std
         return z
+
+    @staticmethod
+    def inverse_z_score(z: np.ndarray):
+        x = z * Utils.std + Utils.mean
+        return x
 
 
 """以下代码针对已经处理好的PeMS(228)数据集"""
@@ -39,15 +46,15 @@ class TrafficFlowData:
         self.num_nodes = self.w_adj_mat.shape[1]
         self.gen_data()
 
-    def get_weighted_adjacency_matrix(self):
-        df = pd.read_csv(self.w_path, header=None)
-        return df.to_numpy()
+    def get_weighted_adjacency_matrix(self, sigma2=0.1, epsilon=0.5, scaling=True):
+        df = pd.read_csv(self.w_path, header=None).to_numpy()
+        return df
 
     def get_data(self):
         df = pd.read_csv(self.v_path, header=None)
-        train_data = Utils.z_score(df[: self.len_train].to_numpy())
-        val_data = Utils.z_score(df[self.len_train: self.len_train + self.len_val].to_numpy())
-        test_data = Utils.z_score(df[self.len_train + self.len_val:].to_numpy())
+        train_data = df[: self.len_train].to_numpy()
+        val_data = df[self.len_train: self.len_train + self.len_val].to_numpy()
+        test_data = df[self.len_train + self.len_val:].to_numpy()
         return train_data, val_data, test_data
 
     def transform_data(self, data: np.ndarray):
@@ -62,9 +69,9 @@ class TrafficFlowData:
             start = i
             end = i + self.in_timesteps
             x[i, :, :, :] = data[start: end].reshape(self.in_timesteps, self.num_nodes, 1)
-            y[i] = data[end + self.out_timesteps - 1] * Utils.std + Utils.mean
+            y[i] = data[end + self.out_timesteps - 1]
 
-        return torch.Tensor(x).to(self.device), torch.Tensor(y).to(self.device)
+        return x, y
 
     def gen_data(self):
         # generate formatted data
@@ -72,18 +79,27 @@ class TrafficFlowData:
         train_data_x, train_data_y = self.transform_data(train_data)
         val_data_x, val_data_y = self.transform_data(val_data)
         test_data_x, test_data_y = self.transform_data(test_data)
+        Utils.fit(np.hstack((train_data_x.flatten(), train_data_y.flatten())))
+        train_data_x = torch.Tensor(Utils.z_score(train_data_x)).to(self.device)
+        train_data_y = torch.Tensor(Utils.z_score(train_data_y)).to(self.device)
+        val_data_x = torch.Tensor(Utils.z_score(val_data_x)).to(self.device)
+        val_data_y = torch.Tensor(Utils.z_score(val_data_y)).to(self.device)
+        test_data_x = torch.Tensor(Utils.z_score(test_data_x)).to(self.device)
+        test_data_y = torch.Tensor(Utils.z_score(test_data_y)).to(self.device)
+        # test_data_y = torch.Tensor(test_data_y).to(self.device)
+
         self.train = TensorDataset(train_data_x, train_data_y)
         self.val = TensorDataset(val_data_x, val_data_y)
         self.test = TensorDataset(test_data_x, test_data_y)
 
     def get_conv_kernel(self, approx: str):
         if approx == "Linear":
-            A_wave = np.eye(self.num_nodes, self.num_nodes) + self.w_adj_mat
-            degree_arr = A_wave.diagonal()
-            degree_mat = np.diag(degree_arr)
+            W_wave = np.eye(self.num_nodes, self.num_nodes) + self.w_adj_mat
+            D_wave = np.diag(np.sum(W_wave, axis=1))
             kernel = np.matmul(
-                np.matmul(fractional_matrix_power(degree_mat, -0.5), A_wave),
-                fractional_matrix_power(degree_mat, -0.5))
+                np.matmul(fractional_matrix_power(D_wave, -0.5), W_wave),
+                fractional_matrix_power(D_wave, -0.5)
+            )
             return torch.Tensor(kernel).to(self.device)
         elif approx == "Cheb":
             pass

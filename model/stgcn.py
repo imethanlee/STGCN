@@ -117,13 +117,13 @@ class GraphConv(nn.Module):
 
     def forward(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
         gc_out = None
-        # Graph Convolution Approximation: 1. Linear 2. Chebshev
+        # Graph Convolution Approximation: 1. linear 2. chebshev
         x_gca = self.gca(x)
         _, ts, nn, oc = x_gca.shape
-        if self.approx == "Linear":
+        if self.approx == "linear":
             fully_conn = torch.matmul(x_gca.reshape(-1, oc), self.weight).reshape(nn, -1)
             gc_out = torch.sparse.mm(kernel, fully_conn).reshape(-1, ts, nn, oc)
-        elif self.approx == "Cheb":
+        elif self.approx == "cheb":
             gc_out = kernel
 
         # add bias
@@ -137,7 +137,7 @@ class GraphConv(nn.Module):
 class Output(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, ko: int, num_nodes: int):
         super(Output, self).__init__()
-        middle_channels = 2 * in_channels
+        middle_channels = 1 * in_channels
         self.temporal_conv1 = TemporalConv(kt=ko,
                                            in_channels=in_channels,
                                            out_channels=middle_channels,
@@ -202,7 +202,7 @@ class STGCN(nn.Module):
                  num_timesteps_output: int = 1,
                  temporal_channels: int = 64,
                  spacial_channels: int = 16,
-                 graph_conv_approx: str = "Linear",
+                 graph_conv_approx: str = "linear",
                  temporal_kernel_size: int = 3):
         super(STGCN, self).__init__()
         self.graph_conv_kernel = graph_conv_kernel

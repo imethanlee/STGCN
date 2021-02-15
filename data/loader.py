@@ -25,16 +25,13 @@ class Utils:
         x = z * Utils.std + Utils.mean
         return x
 
-    @staticmethod # 存档，可能在其他项目用
+    @staticmethod  # 存档，可能在其他项目用
     def weight_matrix_preprocessing(file_path, normalized_k=0.1):
         dist_mat = pd.read_csv(file_path, header=None).to_numpy()
         std = np.std(dist_mat.flatten())
         adj_mat = np.exp(-np.square(dist_mat / std))
         adj_mat[adj_mat < normalized_k] = 0
         return adj_mat
-
-
-"""以下代码针对已经处理好的PeMS(228)数据集"""
 
 
 class TrafficFlowData:
@@ -126,11 +123,3 @@ class TrafficFlowData:
         else:
             raise ValueError("No such type!")
 
-
-# tfd = TrafficFlowData("PeMS_V_228.csv", "PeMS_W_228.csv", 200, 200)
-# print(tfd.train_data_x.shape, tfd.train_data_y.shape)
-# print(tfd.val_data_x.shape, tfd.val_data_y.shape)
-# print(tfd.test_data_x.shape, tfd.test_data_y.shape)
-
-
-"""以下代码针对METR数据集"""

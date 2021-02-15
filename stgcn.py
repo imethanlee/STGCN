@@ -4,6 +4,7 @@ import torch.nn.init as init
 import torch.optim as optim
 import numpy as np
 
+
 class TemporalChannelAlign(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super(TemporalChannelAlign, self).__init__()
@@ -71,15 +72,15 @@ class TemporalConv(nn.Module):
         if self.activation == "GLU":
             p = x_conv[:, :self.out_channels, :, :]
             q = x_conv[:, -self.out_channels:, :, :]
-            # pp = p + x_tca
-            # qq = q
-            pp = self.linear((p + x_tca).permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
-            qq = self.linear(q.permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
-            tc_out = pp * torch.sigmoid(qq)
+            pp = p + x_tca
+            qq = q
+            # pp = self.linear((p + x_tca).permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
+            # qq = self.linear(q.permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
+            tc_out = torch.mul(pp, torch.sigmoid(qq))
         elif self.activation == "sigmoid":
             tc_out = self.sigmoid(x_conv)
         elif self.activation == "relu":
-            tc_out = self.relu(x_conv)
+            tc_out = self.relu(x_conv + x_tca)
         else:
             raise ValueError("No such activation")
         tc_out = tc_out.permute(0, 3, 2, 1)
@@ -115,12 +116,13 @@ class GraphConv(nn.Module):
             init.uniform_(self.bias, -stdv_b, stdv_b)
 
     def forward(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
+        gc_out = None
         # Graph Convolution Approximation: 1. Linear 2. Chebshev
         x_gca = self.gca(x)
-        gc_out = None
+        _, ts, nn, oc = x_gca.shape
         if self.approx == "Linear":
-            fully_conn = torch.matmul(x_gca, self.weight)
-            gc_out = torch.matmul(kernel, fully_conn)
+            fully_conn = torch.matmul(x_gca.reshape(-1, oc), self.weight).reshape(nn, -1)
+            gc_out = torch.sparse.mm(kernel, fully_conn).reshape(-1, ts, nn, oc)
         elif self.approx == "Cheb":
             gc_out = kernel
 
@@ -128,7 +130,8 @@ class GraphConv(nn.Module):
         if self.use_bias:
             gc_out += self.bias
 
-        return gc_out
+        # residual connection
+        return gc_out + x_gca
 
 
 class Output(nn.Module):
@@ -174,6 +177,7 @@ class STConvBlock(nn.Module):
                             out_channels=spacial_channels,
                             approx=graph_conv_approx,
                             use_bias=True)
+        self.relu = nn.ReLU()
         self.tc2 = TemporalConv(kt=kt,
                                 in_channels=spacial_channels,
                                 out_channels=temporal_channels,
@@ -183,7 +187,7 @@ class STConvBlock(nn.Module):
 
     def forward(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
         out1 = self.tc1(x)
-        out2 = torch.relu(self.gc(out1, kernel))
+        out2 = self.relu(self.gc(out1, kernel))
         out3 = self.tc2(out2)
         out4 = self.layer_norm(out3)
         return out4

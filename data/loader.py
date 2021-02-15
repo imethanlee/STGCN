@@ -108,7 +108,19 @@ class TrafficFlowData:
                 np.matmul(fractional_matrix_power(D_wave, -0.5), W_wave),
                 fractional_matrix_power(D_wave, -0.5)
             )
-            return torch.Tensor(kernel).to(self.device)
+            # return torch.Tensor(kernel).to(self.device)
+            # convert to sparse tensor
+            r, c, v = [], [], []
+            for i in range(len(kernel)):
+                for j in range(len(kernel[0])):
+                    if kernel[i, j] != 0:
+                        r.append(i)
+                        c.append(j)
+                        v.append(kernel[i, j])
+            index = torch.LongTensor([r, c])
+            value = torch.FloatTensor(v)
+            sparse_kernel = torch.sparse.FloatTensor(index, value, [self.num_nodes, self.num_nodes])
+            return sparse_kernel.to(self.device)
         elif approx == "Cheb":
             pass
         else:

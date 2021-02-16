@@ -77,10 +77,10 @@ class TemporalConv(nn.Module):
             # pp = self.linear((p + x_tca).permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
             # qq = self.linear(q.permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
             tc_out = torch.mul(pp, torch.sigmoid(qq))
-        elif self.activation == "sigmoid":
-            tc_out = self.sigmoid(x_conv)
         elif self.activation == "relu":
             tc_out = self.relu(x_conv + x_tca)
+        elif self.activation == "sigmoid":
+            tc_out = self.sigmoid(x_conv)
         else:
             raise ValueError("No such activation")
         tc_out = tc_out.permute(0, 3, 2, 1)

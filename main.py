@@ -12,11 +12,12 @@ parser.add_argument('--lr', type=int, default=1e-3)
 parser.add_argument('--weight_decay', type=int, default=0)
 parser.add_argument('--batch_size', type=int, default=50)
 parser.add_argument('--epochs', type=int, default=50)
-parser.add_argument('--drop_rate', type=float, default=0.5)
+parser.add_argument('--decay_rate', type=float, default=0.7)
+parser.add_argument('--decay_steps', type=int, default=5)
 parser.add_argument('--opt', type=str, default='RMSProp')
 parser.add_argument('--approx', type=str, default='linear')
-parser.add_argument('--v_path', type=str, default='./data/metr_V_207.csv')
-parser.add_argument('--w_path', type=str, default='./data/metr_W_207.csv')
+parser.add_argument('--v_path', type=str, default='./data/PeMS_V_228.csv')
+parser.add_argument('--w_path', type=str, default='./data/PeMS_W_228.csv')
 parser.add_argument('--save_path', type=str, default='./model/save/')
 parser.add_argument('--in_timesteps', type=int, default=12)
 parser.add_argument('--out_timesteps', type=int, default=3)
@@ -48,7 +49,7 @@ test_iter = DataLoader(data.test, args.batch_size)
 model = STGCN(num_nodes=data.num_nodes, graph_conv_kernel=data.get_conv_kernel("Linear")).to(device)
 criterion = nn.MSELoss().to(device)
 optimizer = optim.RMSprop(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.7)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.decay_steps, gamma=args.decay_rate)
 
 
 def val():
@@ -79,7 +80,7 @@ def train():
         print('Epoch: {:03d} | Lr: {:.20f} | Train loss: {:.6f} | Val loss: {:.6f}'.format(
             epoch, optimizer.param_groups[0]['lr'], loss_sum / n, val_loss))
         scheduler.step()
-        torch.save(model.state_dict(), './model/save/stgcn_{}'.format(args.approx))
+        # torch.save(model.state_dict(), './model/save/stgcn_{}'.format(args.approx))
     print("Training Completed!")
 
 

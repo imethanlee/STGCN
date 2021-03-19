@@ -6,7 +6,7 @@ import tqdm
 import time
 import argparse
 
-# arg parse123
+# arg parse
 parser = argparse.ArgumentParser()
 parser.add_argument('--lr', type=int, default=1e-3)
 parser.add_argument('--weight_decay', type=int, default=0)

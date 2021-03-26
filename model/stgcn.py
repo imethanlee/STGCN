@@ -20,6 +20,7 @@ class TemporalChannelAlign(nn.Module):
             # add channels by padding 0
             batch_size, channels, num_nodes, timesteps = x.shape
             x_tca = torch.cat([x, torch.zeros(batch_size, self.out_channels - channels, num_nodes, timesteps).to(x)], dim=1)
+            # x_tca = self.conv(x)
         else:
             x_tca = x
         return x_tca
@@ -74,8 +75,6 @@ class TemporalConv(nn.Module):
             q = x_conv[:, -self.out_channels:, :, :]
             pp = p + x_tca
             qq = q
-            # pp = self.linear((p + x_tca).permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
-            # qq = self.linear(q.permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
             tc_out = torch.mul(pp, torch.sigmoid(qq))
         elif self.activation == "relu":
             tc_out = self.relu(x_conv + x_tca)
@@ -137,7 +136,7 @@ class GraphConv(nn.Module):
 class Output(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, ko: int, num_nodes: int):
         super(Output, self).__init__()
-        middle_channels = 1 * in_channels
+        middle_channels = 2 * in_channels
         self.temporal_conv1 = TemporalConv(kt=ko,
                                            in_channels=in_channels,
                                            out_channels=middle_channels,
@@ -157,9 +156,9 @@ class Output(nn.Module):
 
     def forward(self, x: torch.Tensor):
         output_t1 = self.temporal_conv1(x)
-        output_ln = self.layer_norm(output_t1)
-        output_t2 = self.temporal_conv2(output_ln)
-        output = self.linear(output_t2)
+        # output_ln = self.layer_norm(output_t1)
+        # output_t2 = self.temporal_conv2(output_ln)
+        output = self.linear(output_t1)
         return output
 
 
@@ -182,7 +181,7 @@ class STConvBlock(nn.Module):
                                 in_channels=spacial_channels,
                                 out_channels=temporal_channels,
                                 num_nodes=num_nodes,
-                                activation="relu")
+                                activation="GLU")
         self.layer_norm = nn.LayerNorm([num_nodes, temporal_channels])
 
     def forward(self, x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:

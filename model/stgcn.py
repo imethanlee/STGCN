@@ -136,7 +136,7 @@ class GraphConv(nn.Module):
 class Output(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, ko: int, num_nodes: int):
         super(Output, self).__init__()
-        middle_channels = 2 * in_channels
+        middle_channels = 1 * in_channels
         self.temporal_conv1 = TemporalConv(kt=ko,
                                            in_channels=in_channels,
                                            out_channels=middle_channels,

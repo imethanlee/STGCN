@@ -60,9 +60,10 @@ class TrafficFlowData:
         len_df = len(df)
         len_train = int(self.train_pct * len_df)
         len_test = int(self.test_pct * len_df)
+        len_val = len_df - len_train - len_test
         train_data = df[: len_train].to_numpy()
-        test_data = df[len_train: len_train + len_test].to_numpy()
-        val_data = df[len_train + len_test:].to_numpy()
+        val_data = df[len_train: len_train + len_val].to_numpy()
+        test_data = df[-len_test:].to_numpy()
         return train_data, test_data, val_data
 
     def transform_data(self, data: np.ndarray):

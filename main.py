@@ -26,6 +26,7 @@ parser.add_argument('--train_pct', type=float, default=0.7)
 parser.add_argument('--test_pct', type=float, default=0.2)
 
 args = parser.parse_args()
+model_save_path = args.save_path + "STGCN_trained_" + args.v_path[-12:-4] + "_" + str(args.out_time)
 
 # device
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -84,8 +85,7 @@ def train():
         if early_stop.check(val_loss):
             break
         if early_stop.save:
-            torch.save(model.state_dict(), args.save_path + "STGCN_trained_"
-                       + args.v_path[-12:-4] + "_" + str(args.out_time))
+            torch.save(model.state_dict(), model_save_path)
 
         print('Epoch: {:03d} | Lr: {:.20f} | Train loss: {:.6f} | Val loss: {:.6f} | Early Stop: {:02d}'.format(
             epoch, optimizer.param_groups[0]['lr'], loss_sum / n, val_loss, early_stop.cnt))
@@ -94,7 +94,7 @@ def train():
 
 
 def test():
-    model.load_state_dict(torch.load(args.save_path))
+    model.load_state_dict(torch.load(model_save_path))
     model.eval()
     loss_sum, n = 0., 0
     with torch.no_grad():

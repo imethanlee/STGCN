@@ -105,19 +105,19 @@ def test():
             n += y.shape[0]
         loss = loss_sum / n
 
-        mae, mape, mse = [], [], []
+        ae, ape, se = [], [], []
         for x, y in test_iter:
             y = Utils.inverse_z_score(y.cpu().numpy()).reshape(-1)
             y_pred = Utils.inverse_z_score(model(x).view(len(x), -1).cpu().numpy()).reshape(-1)
             d = np.abs(y - y_pred)
-            mae += d.tolist()
-            mape += (np.divide(d, y)).tolist()
-            mse += (np.power(d, 2)).tolist()
-        MAE = np.array(mae).mean()
-        MAPE = np.array(mape).mean()
-        RMSE = np.sqrt(np.array(mse).mean())
+            ae += d.tolist()
+            ape += (np.divide(d, y)).tolist()
+            se += (np.power(d, 2)).tolist()
+        mae = np.array(ae).mean()
+        mape = np.array(ape).mean()
+        rmse = np.sqrt(np.array(se).mean())
     print('Test loss {:.6f}'.format(loss))
-    print('MAE {:.6f} | MAPE {:.8f} | RMSE {:.6f}'.format(MAE, MAPE, RMSE))
+    print('MAE {:.6f} | MAPE {:.8f} | RMSE {:.6f}'.format(mae, mape, rmse))
 
 
 # summary(model, (12, num_nodes, 1))

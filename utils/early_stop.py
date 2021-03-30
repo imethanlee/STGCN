@@ -6,6 +6,7 @@ class EarlyStop:
         self.cnt = 0
         self.patience = patience
         self.minimization = minimization
+        self.save = False
         if minimization:
             self.best_val = np.inf
         else:
@@ -17,11 +18,15 @@ class EarlyStop:
         else:
             return input1 > input2
 
-    def check(self, val, model, path):
+    def check(self, val):
         if self.__is_better_than(val, self.best_val):
             self.best_val = val
             self.cnt = 0
+            self.save = True
+        else:
+            self.save = False
         self.cnt += 1
         if self.cnt > self.patience:
             return True
         return False
+

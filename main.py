@@ -17,7 +17,7 @@ parser.add_argument('--decay_steps', type=int, default=5)
 parser.add_argument('--approx', type=str, default='linear')
 parser.add_argument('--v_path', type=str, default='./data/v_pems_228.csv')
 parser.add_argument('--w_path', type=str, default='./data/w_pems_228.csv')
-parser.add_argument('--save_path', type=str, default='./model/save/')
+parser.add_argument('--save_path', type=str, default='./model/save/STGCN_trained')
 parser.add_argument('--n_time', type=int, default=12)
 parser.add_argument('--out_time', type=int, default=3)
 parser.add_argument('--train_pct', type=float, default=0.7)
@@ -63,6 +63,7 @@ def val():
 
 
 def train():
+    early_stop = EarlyStop(args.patience)
     for epoch in range(1, args.epochs + 1):
         model.train()
         loss_sum, n = 0., 0
@@ -75,10 +76,15 @@ def train():
             loss_sum += loss.item() * y.shape[0]
             n += y.shape[0]
         val_loss = val()
+
+        if early_stop.check(val_loss):
+            break
+        if early_stop.save:
+            torch.save(model.state_dict(), args.save_path)
+
         print('Epoch: {:03d} | Lr: {:.20f} | Train loss: {:.6f} | Val loss: {:.6f}'.format(
             epoch, optimizer.param_groups[0]['lr'], loss_sum / n, val_loss))
         scheduler.step()
-        # torch.save(model.state_dict(), './model/save/stgcn_{}'.format(args.approx))
     print("Training Completed!")
 
 

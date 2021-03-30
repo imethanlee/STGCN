@@ -11,13 +11,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--lr', type=int, default=1e-3)
 parser.add_argument('--weight_decay', type=int, default=0)
 parser.add_argument('--batch_size', type=int, default=50)
-parser.add_argument('--epochs', type=int, default=50)
+parser.add_argument('--epochs', type=int, default=10000)
 parser.add_argument('--decay_rate', type=float, default=0.7)
 parser.add_argument('--decay_steps', type=int, default=5)
 parser.add_argument('--approx', type=str, default='linear')
+parser.add_argument('--save_path', type=str, default='./model/save/STGCN_trained.pkl')
+parser.add_argument('--patience', type=int, default=20)
+
 parser.add_argument('--v_path', type=str, default='./data/v_pems_228.csv')
 parser.add_argument('--w_path', type=str, default='./data/w_pems_228.csv')
-parser.add_argument('--save_path', type=str, default='./model/save/STGCN_trained.pkl')
 parser.add_argument('--n_time', type=int, default=12)
 parser.add_argument('--out_time', type=int, default=3)
 parser.add_argument('--train_pct', type=float, default=0.7)
@@ -81,10 +83,10 @@ def train():
             break
         if early_stop.save:
             torch.save(model.state_dict(), args.save_path)
-            print("A better model has been saved")
 
-        print('Epoch: {:03d} | Lr: {:.20f} | Train loss: {:.6f} | Val loss: {:.6f}'.format(
-            epoch, optimizer.param_groups[0]['lr'], loss_sum / n, val_loss))
+        print('Epoch: {:03d} | Lr: {:.20f} | Train loss: {:.6f} | Val loss: {:.6f} | Early Stop: {:02d}'.format(
+            epoch, optimizer.param_groups[0]['lr'], loss_sum / n, val_loss, early_stop.cnt))
+
         scheduler.step()
     print("Training Completed!")
 

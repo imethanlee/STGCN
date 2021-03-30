@@ -80,6 +80,7 @@ def train():
         if early_stop.check(val_loss):
             break
         if early_stop.save:
+            print()
             torch.save(model.state_dict(), args.save_path)
 
         print('Epoch: {:03d} | Lr: {:.20f} | Train loss: {:.6f} | Val loss: {:.6f}'.format(

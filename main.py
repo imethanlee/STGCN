@@ -15,7 +15,7 @@ parser.add_argument('--epochs', type=int, default=10000)
 parser.add_argument('--decay_rate', type=float, default=0.7)
 parser.add_argument('--decay_steps', type=int, default=5)
 parser.add_argument('--approx', type=str, default='linear')
-parser.add_argument('--save_path', type=str, default='./model/save/STGCN_trained.pkl')
+parser.add_argument('--save_path', type=str, default='./model/save/')
 parser.add_argument('--patience', type=int, default=20)
 
 parser.add_argument('--v_path', type=str, default='./data/v_pems_228.csv')
@@ -77,17 +77,19 @@ def train():
             optimizer.step()
             loss_sum += loss.item() * y.shape[0]
             n += y.shape[0]
+        scheduler.step()
+
         val_loss = val()
 
         if early_stop.check(val_loss):
             break
         if early_stop.save:
-            torch.save(model.state_dict(), args.save_path)
+            torch.save(model.state_dict(), args.save_path + "STGCN_trained_"
+                       + args.v_path[-12:-4] + "_" + str(args.out_time))
 
         print('Epoch: {:03d} | Lr: {:.20f} | Train loss: {:.6f} | Val loss: {:.6f} | Early Stop: {:02d}'.format(
             epoch, optimizer.param_groups[0]['lr'], loss_sum / n, val_loss, early_stop.cnt))
 
-        scheduler.step()
     print("Training Completed!")
 
 

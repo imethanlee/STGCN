@@ -26,7 +26,7 @@ class EarlyStop:
         else:
             self.save = False
         self.cnt += 1
-        if self.cnt > self.patience:
+        if self.cnt >= self.patience:
             return True
         return False
 

@@ -2,10 +2,11 @@ import numpy as np
 
 
 class EarlyStop:
-    def __init__(self, patience: int, minimization: bool = True):
+    def __init__(self, patience: int, minimization: bool = True, tol: float = 1e-5):
         self.cnt = 0
         self.patience = patience
         self.minimization = minimization
+        self.tol = -tol
         self.save = False
         if minimization:
             self.best_val = np.inf
@@ -14,9 +15,9 @@ class EarlyStop:
 
     def __is_better_than(self, input1, input2):
         if self.minimization:
-            return input1 < input2
+            return input1 - input2 < self.tol
         else:
-            return input1 > input2
+            return input2 - input1 < self.tol
 
     def check(self, val):
         if self.__is_better_than(val, self.best_val):
@@ -29,4 +30,3 @@ class EarlyStop:
         if self.cnt >= self.patience:
             return True
         return False
-
